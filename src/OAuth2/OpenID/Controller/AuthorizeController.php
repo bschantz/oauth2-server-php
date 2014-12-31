@@ -69,6 +69,106 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
         return true;
     }
 
+
+    /**
+     * @param ResponseInterface $response
+     * @param $response_type
+     * @param $redirect_uri
+     * @param $state
+     * @param $client_id
+     *
+     * @return bool
+     */
+    protected function validateResponseType(
+            ResponseInterface $response,
+            $response_type,
+            $redirect_uri,
+            $state,
+            $client_id
+    ) {
+        if ($response_type == self::RESPONSE_TYPE_AUTHORIZATION_CODE) {
+            if (!isset($this->responseTypes['code'])) {
+                $response->setRedirect(
+                        $this->config['redirect_status_code'],
+                        $redirect_uri,
+                        $state,
+                        'unsupported_response_type',
+                        'authorization code grant type not supported',
+                        null
+                );
+
+                return false;
+            }
+            if (!$this->clientStorage->checkRestrictedGrantType($client_id, 'authorization_code')) {
+                $response->setRedirect(
+                        $this->config['redirect_status_code'],
+                        $redirect_uri,
+                        $state,
+                        'unauthorized_client',
+                        'The grant type is unauthorized for this client_id',
+                        null
+                );
+
+                return false;
+            }
+            if ($this->responseTypes['code']->enforceRedirect() && !$redirect_uri) {
+                $response->setError(400, 'redirect_uri_mismatch', 'The redirect URI is mandatory and was not supplied');
+
+                return false;
+            }
+        } elseif ($response_type == self::RESPONSE_TYPE_ID_TOKEN) {
+            if (!isset($this->responseTypes[self::RESPONSE_TYPE_ID_TOKEN])) {
+                $response->setRedirect(
+                        $this->config['redirect_status_code'],
+                        $redirect_uri,
+                        $state,
+                        'unsupported_response_type',
+                        'id token grant type not supported',
+                        null
+                );
+                return false;
+            }
+            if (!$this->clientStorage->checkRestrictedGrantType($client_id, 'id_token')) {
+                $response->setRedirect(
+                        $this->config['redirect_status_code'],
+                        $redirect_uri,
+                        $state,
+                        'unauthorized_client',
+                        'The grant type is unauthorized for this client_id',
+                        null
+                );
+
+                return false;
+            }
+        } else {
+            if (!$this->config['allow_implicit']) {
+                $response->setRedirect(
+                        $this->config['redirect_status_code'],
+                        $redirect_uri,
+                        $state,
+                        'unsupported_response_type',
+                        'implicit grant type not supported',
+                        null
+                );
+
+                return false;
+            }
+            if (!$this->clientStorage->checkRestrictedGrantType($client_id, 'implicit')) {
+                $response->setRedirect(
+                        $this->config['redirect_status_code'],
+                        $redirect_uri,
+                        $state,
+                        'unauthorized_client',
+                        'The grant type is unauthorized for this client_id',
+                        null
+                );
+
+                return false;
+            }
+        }
+        return true;
+    }
+
     protected function getValidResponseTypes()
     {
         return array(
@@ -89,7 +189,7 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
      * @param $request_scope
      *  A space-separated string of scopes.
      *
-     * @return
+     * @return boolean
      *   TRUE if an id token is needed, FALSE otherwise.
      */
     public function needsIdToken($request_scope)

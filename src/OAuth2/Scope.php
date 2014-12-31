@@ -35,10 +35,10 @@ class Scope implements ScopeInterface
      * @param $required_scope
      * A space-separated string of scopes.
      *
-     * @return
+     * @param $available_scope string
+     * @return bool TRUE if everything in required scope is contained in available scope,
      * TRUE if everything in required scope is contained in available scope,
      * and FALSE if it isn't.
-     *
      * @see http://tools.ietf.org/html/rfc6749#section-7
      *
      * @ingroup oauth2_section_7
@@ -57,7 +57,7 @@ class Scope implements ScopeInterface
      * @param $scope
      * A space-separated string of scopes.
      *
-     * @return
+     * @return bool TRUE if it exists, FALSE otherwise.
      * TRUE if it exists, FALSE otherwise.
      */
     public function scopeExists($scope)
@@ -93,7 +93,7 @@ class Scope implements ScopeInterface
      * In case OpenID Connect is used, these scopes must include:
      * 'openid', offline_access'.
      *
-     * @return
+     * @return array
      * An array of reserved scopes.
      */
     public function getReservedScopes()

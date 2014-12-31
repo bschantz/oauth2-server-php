@@ -2,11 +2,11 @@
 
 namespace OAuth2\Controller;
 
-use OAuth2\Storage\ClientInterface;
-use OAuth2\ScopeInterface;
 use OAuth2\RequestInterface;
 use OAuth2\ResponseInterface;
 use OAuth2\Scope;
+use OAuth2\ScopeInterface;
+use OAuth2\Storage\ClientInterface;
 
 /**
  * @see OAuth2\Controller\AuthorizeControllerInterface
@@ -25,7 +25,7 @@ class AuthorizeController implements AuthorizeControllerInterface
     protected $scopeUtil;
 
     /**
-     * @param OAuth2\Storage\ClientInterface $clientStorage REQUIRED Instance of OAuth2\Storage\ClientInterface to retrieve client information
+     * @param ClientInterface $clientStorage REQUIRED Instance of OAuth2\Storage\ClientInterface to retrieve client information
      * @param array                          $responseTypes OPTIONAL Array of OAuth2\ResponseType\ResponseTypeInterface objects.  Valid array
      *                                                      keys are "code" and "token"
      * @param array                          $config        OPTIONAL Configuration options for the server
@@ -37,7 +37,7 @@ class AuthorizeController implements AuthorizeControllerInterface
      *                                                      'redirect_status_code' => 302,        // HTTP status code to use for redirect responses
      *                                                      );
      *                                                      </code>
-     * @param OAuth2\ScopeInterface          $scopeUtil     OPTIONAL Instance of OAuth2\ScopeInterface to validate the requested scope
+     * @param ScopeInterface          $scopeUtil     OPTIONAL Instance of OAuth2\ScopeInterface to validate the requested scope
      */
     public function __construct(ClientInterface $clientStorage, array $responseTypes = array(), array $config = array(), ScopeInterface $scopeUtil = null)
     {
@@ -200,33 +200,8 @@ class AuthorizeController implements AuthorizeControllerInterface
             return false;
         }
 
-        if ($response_type == self::RESPONSE_TYPE_AUTHORIZATION_CODE) {
-            if (!isset($this->responseTypes['code'])) {
-                $response->setRedirect($this->config['redirect_status_code'], $redirect_uri, $state, 'unsupported_response_type', 'authorization code grant type not supported', null);
-
-                return false;
-            }
-            if (!$this->clientStorage->checkRestrictedGrantType($client_id, 'authorization_code')) {
-                $response->setRedirect($this->config['redirect_status_code'], $redirect_uri, $state, 'unauthorized_client', 'The grant type is unauthorized for this client_id', null);
-
-                return false;
-            }
-            if ($this->responseTypes['code']->enforceRedirect() && !$redirect_uri) {
-                $response->setError(400, 'redirect_uri_mismatch', 'The redirect URI is mandatory and was not supplied');
-
-                return false;
-            }
-        } else {
-            if (!$this->config['allow_implicit']) {
-                $response->setRedirect($this->config['redirect_status_code'], $redirect_uri, $state, 'unsupported_response_type', 'implicit grant type not supported', null);
-
-                return false;
-            }
-            if (!$this->clientStorage->checkRestrictedGrantType($client_id, 'implicit')) {
-                $response->setRedirect($this->config['redirect_status_code'], $redirect_uri, $state, 'unauthorized_client', 'The grant type is unauthorized for this client_id', null);
-
-                return false;
-            }
+        if (!$this->validateResponseType($response, $response_type, $redirect_uri, $state, $client_id)) {
+            return false;
         }
 
         // validate requested scope if it exists
@@ -271,6 +246,82 @@ class AuthorizeController implements AuthorizeControllerInterface
         $this->response_type = $response_type;
 
         return true;
+    }
+
+    /**
+     * @param ResponseInterface $response
+     * @param $response_type
+     * @param $redirect_uri
+     * @param $state
+     * @param $client_id
+     *
+     * @return bool
+     */
+    protected function validateResponseType(
+            ResponseInterface $response,
+            $response_type,
+            $redirect_uri,
+            $state,
+            $client_id
+    ) {
+        $response_valid = true;
+        if ($response_type == self::RESPONSE_TYPE_AUTHORIZATION_CODE) {
+            if (!isset($this->responseTypes['code'])) {
+                $response->setRedirect(
+                        $this->config['redirect_status_code'],
+                        $redirect_uri,
+                        $state,
+                        'unsupported_response_type',
+                        'authorization code grant type not supported',
+                        null
+                );
+
+                $response_valid = false;
+            }
+            if (!$this->clientStorage->checkRestrictedGrantType($client_id, 'authorization_code')) {
+                $response->setRedirect(
+                        $this->config['redirect_status_code'],
+                        $redirect_uri,
+                        $state,
+                        'unauthorized_client',
+                        'The grant type is unauthorized for this client_id',
+                        null
+                );
+
+                $response_valid = false;
+            }
+            if ($this->responseTypes['code']->enforceRedirect() && !$redirect_uri) {
+                $response->setError(400, 'redirect_uri_mismatch', 'The redirect URI is mandatory and was not supplied');
+
+                $response_valid = false;
+            }
+        } else {
+            if (!$this->config['allow_implicit']) {
+                $response->setRedirect(
+                        $this->config['redirect_status_code'],
+                        $redirect_uri,
+                        $state,
+                        'unsupported_response_type',
+                        'implicit grant type not supported',
+                        null
+                );
+
+                $response_valid = false;
+            }
+            if (!$this->clientStorage->checkRestrictedGrantType($client_id, 'implicit')) {
+                $response->setRedirect(
+                        $this->config['redirect_status_code'],
+                        $redirect_uri,
+                        $state,
+                        'unauthorized_client',
+                        'The grant type is unauthorized for this client_id',
+                        null
+                );
+
+                $response_valid = false;
+            }
+        }
+        return $response_valid;
     }
 
     /**
