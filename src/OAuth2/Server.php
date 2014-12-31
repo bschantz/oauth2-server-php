@@ -2,35 +2,37 @@
 
 namespace OAuth2;
 
-use OAuth2\Controller\ResourceControllerInterface;
-use OAuth2\Controller\ResourceController;
-use OAuth2\OpenID\Controller\UserInfoControllerInterface;
-use OAuth2\OpenID\Controller\UserInfoController;
-use OAuth2\OpenID\Controller\AuthorizeController as OpenIDAuthorizeController;
-use OAuth2\OpenID\ResponseType\AuthorizationCode as OpenIDAuthorizationCodeResponseType;
-use OAuth2\OpenID\Storage\AuthorizationCodeInterface as OpenIDAuthorizationCodeInterface;
-use OAuth2\OpenID\GrantType\AuthorizationCode as OpenIDAuthorizationCodeGrantType;
-use OAuth2\Controller\AuthorizeControllerInterface;
-use OAuth2\Controller\AuthorizeController;
-use OAuth2\Controller\TokenControllerInterface;
-use OAuth2\Controller\TokenController;
 use OAuth2\ClientAssertionType\ClientAssertionTypeInterface;
 use OAuth2\ClientAssertionType\HttpBasic;
-use OAuth2\ResponseType\ResponseTypeInterface;
-use OAuth2\ResponseType\AuthorizationCode as AuthorizationCodeResponseType;
-use OAuth2\ResponseType\AccessToken;
-use OAuth2\ResponseType\JwtAccessToken;
+use OAuth2\Controller\AuthorizeController;
+use OAuth2\Controller\AuthorizeControllerInterface;
+use OAuth2\Controller\ResourceController;
+use OAuth2\Controller\ResourceControllerInterface;
+use OAuth2\Controller\TokenController;
+use OAuth2\Controller\TokenControllerInterface;
+use OAuth2\GrantType\AuthorizationCode;
+use OAuth2\GrantType\ClientCredentials;
+use OAuth2\GrantType\GrantTypeInterface;
+use OAuth2\GrantType\RefreshToken;
+use OAuth2\GrantType\UserCredentials;
+use OAuth2\OpenID\Controller\AuthorizeController as OpenIDAuthorizeController;
+use OAuth2\OpenID\Controller\UserInfoController;
+use OAuth2\OpenID\Controller\UserInfoControllerInterface;
+use OAuth2\OpenID\GrantType\AuthorizationCode as OpenIDAuthorizationCodeGrantType;
+use OAuth2\OpenID\ResponseType\AuthorizationCode as OpenIDAuthorizationCodeResponseType;
 use OAuth2\OpenID\ResponseType\IdToken;
 use OAuth2\OpenID\ResponseType\IdTokenToken;
-use OAuth2\TokenType\TokenTypeInterface;
-use OAuth2\TokenType\Bearer;
-use OAuth2\GrantType\GrantTypeInterface;
-use OAuth2\GrantType\UserCredentials;
-use OAuth2\GrantType\ClientCredentials;
-use OAuth2\GrantType\RefreshToken;
-use OAuth2\GrantType\AuthorizationCode;
+use OAuth2\OpenID\Storage\AuthorizationCodeInterface as OpenIDAuthorizationCodeInterface;
+use OAuth2\ResponseType\AccessToken;
+use OAuth2\ResponseType\AuthorizationCode as AuthorizationCodeResponseType;
+use OAuth2\ResponseType\JwtAccessToken;
+use OAuth2\ResponseType\ResponseTypeInterface;
+use OAuth2\Storage\ClientCredentialsInterface;
+use OAuth2\Storage\ClientInterface;
 use OAuth2\Storage\JwtAccessToken as JwtAccessTokenStorage;
 use OAuth2\Storage\JwtAccessTokenInterface;
+use OAuth2\TokenType\Bearer;
+use OAuth2\TokenType\TokenTypeInterface;
 
 /**
 * Server class for OAuth2
@@ -84,15 +86,15 @@ class Server implements ResourceControllerInterface,
     );
 
     /**
-     * @param mixed                                                   $storage             (array or OAuth2\Storage) - single object or array of objects implementing the
+     * @param mixed $storage (array or OAuth2\Storage) - single object or array of objects implementing the
      *                                                                                     required storage types (ClientCredentialsInterface and AccessTokenInterface as a minimum)
-     * @param array                                                   $config              specify a different token lifetime, token header name, etc
-     * @param array                                                   $grantTypes          An array of OAuth2\GrantType\GrantTypeInterface to use for granting access tokens
-     * @param array                                                   $responseTypes       Response types to use.  array keys should be "code" and and "token" for
+     * @param array $config specify a different token lifetime, token header name, etc
+     * @param array $grantTypes An array of OAuth2\GrantType\GrantTypeInterface to use for granting access tokens
+     * @param array $responseTypes Response types to use.  array keys should be "code" and and "token" for
      *                                                                                     Access Token and Authorization Code response types
-     * @param OAuth2\TokenType\TokenTypeInterface                     $tokenType           The token type object to use. Valid token types are "bearer" and "mac"
-     * @param OAuth2\ScopeInterface                                   $scopeUtil           The scope utility class to use to validate scope
-     * @param OAuth2\ClientAssertionType\ClientAssertionTypeInterface $clientAssertionType The method in which to verify the client identity.  Default is HttpBasic
+     * @param TokenTypeInterface $tokenType The token type object to use. Valid token types are "bearer" and "mac"
+     * @param ScopeInterface $scopeUtil The scope utility class to use to validate scope
+     * @param ClientAssertionTypeInterface $clientAssertionType The method in which to verify the client identity.  Default is HttpBasic
      *
      * @ingroup oauth2_section_7
      */
@@ -173,6 +175,7 @@ class Server implements ResourceControllerInterface,
 
     /**
      * every getter deserves a setter
+     * @param AuthorizeControllerInterface $authorizeController
      */
     public function setAuthorizeController(AuthorizeControllerInterface $authorizeController)
     {
@@ -181,6 +184,7 @@ class Server implements ResourceControllerInterface,
 
     /**
      * every getter deserves a setter
+     * @param TokenControllerInterface $tokenController
      */
     public function setTokenController(TokenControllerInterface $tokenController)
     {
@@ -189,6 +193,7 @@ class Server implements ResourceControllerInterface,
 
     /**
      * every getter deserves a setter
+     * @param ResourceControllerInterface $resourceController
      */
     public function setResourceController(ResourceControllerInterface $resourceController)
     {
@@ -197,6 +202,7 @@ class Server implements ResourceControllerInterface,
 
     /**
      * every getter deserves a setter
+     * @param UserInfoControllerInterface $userInfoController
      */
     public function setUserInfoController(UserInfoControllerInterface $userInfoController)
     {
@@ -213,8 +219,10 @@ class Server implements ResourceControllerInterface,
      * @param $response - OAuth2\ResponseInterface
      * Response object containing error messages (failure) or user claims (success)
      *
-     * @throws InvalidArgumentException
-     * @throws LogicException
+     * @return Response|ResponseInterface
+     *
+     * @throws \InvalidArgumentException
+     * @throws \LogicException
      *
      * @see http://openid.net/specs/openid-connect-core-1_0.html#UserInfo
      */
@@ -237,8 +245,9 @@ class Server implements ResourceControllerInterface,
      * @param $response - OAuth2\ResponseInterface
      * Response object containing error messages (failure) or access token (success)
      *
-     * @throws InvalidArgumentException
-     * @throws LogicException
+     * @return Response|ResponseInterface
+     * @throws \InvalidArgumentException
+     * @throws \LogicException
      *
      * @see http://tools.ietf.org/html/rfc6749#section-4
      * @see http://tools.ietf.org/html/rfc6749#section-10.6
@@ -269,7 +278,7 @@ class Server implements ResourceControllerInterface,
      * authorization server should call this function to redirect the user
      * appropriately.
      *
-     * @param $request
+     * @param RequestInterface $request
      * The request should have the follow parameters set in the querystring:
      * - response_type: The requested response: an access token, an
      * authorization code, or both.
@@ -281,11 +290,12 @@ class Server implements ResourceControllerInterface,
      * list of space-delimited strings.
      * - state: (optional) An opaque value used by the client to maintain
      * state between the request and callback.
+     * @param ResponseInterface $response
      * @param $is_authorized
      * TRUE or FALSE depending on whether the user authorized the access.
      * @param $user_id
      * Identifier of user who authorized the client
-     *
+     * @return ResponseInterface
      * @see http://tools.ietf.org/html/rfc6749#section-4
      *
      * @ingroup oauth2_section_4
@@ -308,10 +318,11 @@ class Server implements ResourceControllerInterface,
      * The draft specifies that the parameters should be retrieved from GET, override the Response
      * object to change this
      *
-     * @return
+     * @param RequestInterface $request
+     * @param ResponseInterface $response
+     * @return bool The authorization parameters so the authorization server can prompt
      * The authorization parameters so the authorization server can prompt
      * the user for approval if valid.
-     *
      * @see http://tools.ietf.org/html/rfc6749#section-4.1.1
      * @see http://tools.ietf.org/html/rfc6749#section-10.12
      *
@@ -376,11 +387,11 @@ class Server implements ResourceControllerInterface,
 
             // special logic to handle "client" and "client_credentials" strangeness
             if ($key === 'client' && !isset($this->storages['client_credentials'])) {
-                if ($storage instanceof \OAuth2\Storage\ClientCredentialsInterface) {
+                if ($storage instanceof ClientCredentialsInterface) {
                     $this->storages['client_credentials'] = $storage;
                 }
             } elseif ($key === 'client_credentials' && !isset($this->storages['client'])) {
-                if ($storage instanceof \OAuth2\Storage\ClientInterface) {
+                if ($storage instanceof ClientInterface) {
                     $this->storages['client'] = $storage;
                 }
             }
@@ -439,6 +450,7 @@ class Server implements ResourceControllerInterface,
 
     /**
      * every getter deserves a setter
+     * @param $scopeUtil
      */
     public function setScopeUtil($scopeUtil)
     {
@@ -476,7 +488,7 @@ class Server implements ResourceControllerInterface,
         }
 
         if (is_null($this->clientAssertionType)) {
-            // see if HttpBasic assertion type is requred.  If so, then create it from storage classes.
+            // see if HttpBasic assertion type is required.  If so, then create it from storage classes.
             foreach ($this->grantTypes as $grantType) {
                 if (!$grantType instanceof ClientAssertionTypeInterface) {
                     if (!isset($this->storages['client_credentials'])) {
@@ -685,7 +697,7 @@ class Server implements ResourceControllerInterface,
             $refreshStorage = $this->storages['refresh_token'];
         }
 
-        $config = array_intersect_key($this->config, array_flip(explode(' ', 'store_encrypted_token_string')));
+        $config = array_intersect_key($this->config, array_flip(explode(' ', 'issuer store_encrypted_token_string')));
 
         return new JwtAccessToken($this->storages['public_key'], $tokenStorage, $refreshStorage, $config);
     }
