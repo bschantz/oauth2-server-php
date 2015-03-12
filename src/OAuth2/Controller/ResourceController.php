@@ -16,11 +16,24 @@ class ResourceController implements ResourceControllerInterface
 {
     private $token;
 
+    /** @var TokenTypeInterface */
     protected $tokenType;
+
+    /** @var AccessTokenInterface */
     protected $tokenStorage;
+
+    /** @var array */
     protected $config;
+
+    /** @var Scope|ScopeInterface */
     protected $scopeUtil;
 
+    /**
+     * @param TokenTypeInterface $tokenType
+     * @param AccessTokenInterface $tokenStorage
+     * @param array $config
+     * @param ScopeInterface $scopeUtil
+     */
     public function __construct(TokenTypeInterface $tokenType, AccessTokenInterface $tokenStorage, $config = array(), ScopeInterface $scopeUtil = null)
     {
         $this->tokenType = $tokenType;

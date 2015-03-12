@@ -41,6 +41,7 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
         // Generate an id token if needed.
         if ($this->needsIdToken($this->getScope()) && $this->getResponseType() == self::RESPONSE_TYPE_AUTHORIZATION_CODE) {
             $params['id_token'] = $this->responseTypes['id_token']->createIdToken($this->getClientId(), $user_id, $this->nonce);
+            $params['token_type'] = 'Bearer';
         }
 
         // add the nonce to return with the redirect URI
@@ -55,6 +56,15 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
             return false;
         }
 
+//        if (!$this->validateGrantType(
+//                $response,
+//                $request->query('redirect_uri', $request->request('redirect_uri')),
+//                $request->query('grant_type', $request->request('grant_type')),
+//                $request->request('state', $request->request('state')),
+//                $request->request('client_id', $request->request('client_id'))
+//            )) {
+//            return false;
+//        }
         $nonce = $request->query('nonce');
 
         // Validate required nonce for "id_token" and "id_token token"
@@ -75,7 +85,6 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
      * @param $response_type
      * @param $redirect_uri
      * @param $state
-     * @param $client_id
      *
      * @return bool
      */
@@ -83,8 +92,7 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
             ResponseInterface $response,
             $response_type,
             $redirect_uri,
-            $state,
-            $client_id
+            $state
     ) {
         if ($response_type == self::RESPONSE_TYPE_AUTHORIZATION_CODE) {
             if (!isset($this->responseTypes['code'])) {
@@ -99,18 +107,7 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
 
                 return false;
             }
-            if (!$this->clientStorage->checkRestrictedGrantType($client_id, 'authorization_code')) {
-                $response->setRedirect(
-                        $this->config['redirect_status_code'],
-                        $redirect_uri,
-                        $state,
-                        'unauthorized_client',
-                        'The grant type is unauthorized for this client_id',
-                        null
-                );
 
-                return false;
-            }
             if ($this->responseTypes['code']->enforceRedirect() && !$redirect_uri) {
                 $response->setError(400, 'redirect_uri_mismatch', 'The redirect URI is mandatory and was not supplied');
 
@@ -126,43 +123,6 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
                         'id token grant type not supported',
                         null
                 );
-                return false;
-            }
-            if (!$this->clientStorage->checkRestrictedGrantType($client_id, 'id_token')) {
-                $response->setRedirect(
-                        $this->config['redirect_status_code'],
-                        $redirect_uri,
-                        $state,
-                        'unauthorized_client',
-                        'The grant type is unauthorized for this client_id',
-                        null
-                );
-
-                return false;
-            }
-        } else {
-            if (!$this->config['allow_implicit']) {
-                $response->setRedirect(
-                        $this->config['redirect_status_code'],
-                        $redirect_uri,
-                        $state,
-                        'unsupported_response_type',
-                        'implicit grant type not supported',
-                        null
-                );
-
-                return false;
-            }
-            if (!$this->clientStorage->checkRestrictedGrantType($client_id, 'implicit')) {
-                $response->setRedirect(
-                        $this->config['redirect_status_code'],
-                        $redirect_uri,
-                        $state,
-                        'unauthorized_client',
-                        'The grant type is unauthorized for this client_id',
-                        null
-                );
-
                 return false;
             }
         }

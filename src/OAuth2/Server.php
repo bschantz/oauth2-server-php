@@ -155,6 +155,9 @@ class Server implements ResourceControllerInterface,
         return $this->tokenController;
     }
 
+    /**
+     * @return ResourceController
+     */
     public function getResourceController()
     {
         if (is_null($this->resourceController)) {
@@ -164,6 +167,9 @@ class Server implements ResourceControllerInterface,
         return $this->resourceController;
     }
 
+    /**
+     * @return UserInfoController
+     */
     public function getUserInfoController()
     {
         if (is_null($this->userInfoController)) {

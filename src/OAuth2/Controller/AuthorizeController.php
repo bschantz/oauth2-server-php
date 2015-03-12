@@ -200,7 +200,13 @@ class AuthorizeController implements AuthorizeControllerInterface
             return false;
         }
 
-        if (!$this->validateResponseType($response, $response_type, $redirect_uri, $state, $client_id)) {
+        if (!$this->validateResponseType($response, $response_type, $redirect_uri, $state)) {
+            return false;
+        }
+
+        $grant_type = $request->query('grant_type', $request->request('grant_type'));
+
+        if (!$this->validateGrantType($response, $redirect_uri, $grant_type, $state, $client_id)) {
             return false;
         }
 
@@ -253,16 +259,13 @@ class AuthorizeController implements AuthorizeControllerInterface
      * @param $response_type
      * @param $redirect_uri
      * @param $state
-     * @param $client_id
-     *
      * @return bool
      */
     protected function validateResponseType(
             ResponseInterface $response,
             $response_type,
             $redirect_uri,
-            $state,
-            $client_id
+            $state
     ) {
         $response_valid = true;
         if ($response_type == self::RESPONSE_TYPE_AUTHORIZATION_CODE) {
@@ -273,18 +276,6 @@ class AuthorizeController implements AuthorizeControllerInterface
                         $state,
                         'unsupported_response_type',
                         'authorization code grant type not supported',
-                        null
-                );
-
-                $response_valid = false;
-            }
-            if (!$this->clientStorage->checkRestrictedGrantType($client_id, 'authorization_code')) {
-                $response->setRedirect(
-                        $this->config['redirect_status_code'],
-                        $redirect_uri,
-                        $state,
-                        'unauthorized_client',
-                        'The grant type is unauthorized for this client_id',
                         null
                 );
 
@@ -308,20 +299,44 @@ class AuthorizeController implements AuthorizeControllerInterface
 
                 $response_valid = false;
             }
-            if (!$this->clientStorage->checkRestrictedGrantType($client_id, 'implicit')) {
-                $response->setRedirect(
-                        $this->config['redirect_status_code'],
-                        $redirect_uri,
-                        $state,
-                        'unauthorized_client',
-                        'The grant type is unauthorized for this client_id',
-                        null
-                );
-
-                $response_valid = false;
-            }
         }
         return $response_valid;
+    }
+
+    public function validateGrantType(
+            ResponseInterface $response,
+            $redirect_uri,
+            $grant_type,
+            $state,
+            $client_id)
+    {
+        $grant_valid = true;
+        if ($grant_type == 'implicit' && !$this->config['allow_implicit']) {
+            $response->setRedirect(
+                    $this->config['redirect_status_code'],
+                    $redirect_uri,
+                    $state,
+                    'unsupported_response_type',
+                    'implicit grant type not supported',
+                    null
+            );
+
+            $grant_valid = false;
+        }
+
+        if (!$this->clientStorage->checkRestrictedGrantType($client_id, $grant_type)) {
+            $response->setRedirect(
+                    $this->config['redirect_status_code'],
+                    $redirect_uri,
+                    $state,
+                    'unsupported_grant_type',
+                    $grant_type . ' grant type not supported',
+                    null
+            );
+
+            $grant_valid = false;
+        }
+        return $grant_valid;
     }
 
     /**
